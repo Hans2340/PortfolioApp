@@ -9,23 +9,55 @@
     const price = num(h.price);
     const avgCost = num(h.avgCost);
     const prev = num(h.prevClose);
+    const income = num(h.income); // dividends paid out in cash
     const value = qty * price;
     const cost = qty * avgCost;
-    const gain = value - cost;
+    const gain = value - cost + income;
     const gainPct = cost > 0 ? (gain / cost) * 100 : 0;
     const dayChange = prev > 0 ? qty * (price - prev) : 0;
     const dayPct = prev > 0 ? ((price - prev) / prev) * 100 : 0;
-    return { value, cost, gain, gainPct, dayChange, dayPct };
+    return { value, cost, gain, gainPct, dayChange, dayPct, dividends: totalDividends(h) };
+  }
+
+  function totalDividends(h) {
+    return (Array.isArray(h.dividends) ? h.dividends : []).reduce((a, d) => a + num(d.amount), 0);
+  }
+
+  /**
+   * Record a dividend / income distribution on a holding (mutates and returns it).
+   * reinvest=true: amount buys new units at `unitPrice`; total cost is unchanged,
+   *   so the average cost per unit drops and the dividend shows up as gain.
+   * reinvest=false: amount is cash income, added to `income`.
+   */
+  function recordDividend(h, { amount, date, reinvest, unitPrice, rate }) {
+    const amt = num(amount);
+    if (amt <= 0) return h;
+    const entry = { d: date, amount: Math.round(amt * 100) / 100, reinvested: !!reinvest };
+    if (rate) entry.rate = num(rate);
+    if (reinvest) {
+      const p = num(unitPrice) || num(h.price);
+      if (p <= 0) throw new Error('A unit price is needed to reinvest');
+      const cost = num(h.quantity) * num(h.avgCost);
+      const units = amt / p;
+      h.quantity = num(h.quantity) + units;
+      h.avgCost = h.quantity > 0 ? cost / h.quantity : 0;
+      entry.units = Math.round(units * 10000) / 10000;
+    } else {
+      h.income = num(h.income) + amt;
+    }
+    h.dividends = (Array.isArray(h.dividends) ? h.dividends : []).concat(entry);
+    return h;
   }
 
   function portfolioTotals(holdings) {
-    let value = 0, cost = 0, dayChange = 0, prevValue = 0;
+    let value = 0, cost = 0, dayChange = 0, prevValue = 0, dividends = 0;
     for (const h of holdings) {
       const m = holdingMetrics(h);
       value += m.value;
       cost += m.cost;
       dayChange += m.dayChange;
       prevValue += m.value - m.dayChange;
+      dividends += m.dividends;
     }
     const gain = value - cost;
     return {
@@ -35,6 +67,7 @@
       gainPct: cost > 0 ? (gain / cost) * 100 : 0,
       dayChange,
       dayPct: prevValue > 0 ? (dayChange / prevValue) * 100 : 0,
+      dividends,
       count: holdings.length,
     };
   }
@@ -87,7 +120,7 @@
   }
 
   function toCSV(holdings) {
-    const cols = ['type', 'symbol', 'name', 'quantity', 'avgCost', 'price', 'value', 'cost', 'gain', 'gainPct'];
+    const cols = ['type', 'symbol', 'name', 'quantity', 'avgCost', 'price', 'value', 'cost', 'dividends', 'gain', 'gainPct'];
     const esc = (v) => {
       const s = String(v ?? '');
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -95,12 +128,12 @@
     const rows = holdings.map((h) => {
       const m = holdingMetrics(h);
       return [h.type, h.symbol, h.name, h.quantity, h.avgCost, h.price,
-        m.value.toFixed(2), m.cost.toFixed(2), m.gain.toFixed(2), m.gainPct.toFixed(2)].map(esc).join(',');
+        m.value.toFixed(2), m.cost.toFixed(2), m.dividends.toFixed(2), m.gain.toFixed(2), m.gainPct.toFixed(2)].map(esc).join(',');
     });
     return [cols.join(','), ...rows].join('\n');
   }
 
-  const api = { holdingMetrics, portfolioTotals, allocation, upsertSnapshot, filterHistory, isoDate, mergeBuy, toCSV };
+  const api = { holdingMetrics, portfolioTotals, recordDividend, totalDividends, allocation, upsertSnapshot, filterHistory, isoDate, mergeBuy, toCSV };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Calc = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -79,6 +79,14 @@ button, input, select { font: inherit; color: inherit; }
 .btn.spinning svg { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .file-btn { position: relative; }
+.dialog-body label.check { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.dialog-body label.check input { width: 18px; height: 18px; min-height: 0; margin: 0; accent-color: var(--accent); }
+.div-history { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.div-history h3 { font-size: 13px; margin: 0 0 6px; display: flex; justify-content: space-between; }
+.div-history ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 140px; overflow-y: auto; }
+.div-history li { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); }
+.div-history li b { color: var(--text); font-weight: 600; }
+.table td small.div { color: var(--muted); }
 
 /* ---------- layout ---------- */
 .container { max-width: 1240px; margin: 0 auto; padding: 20px 16px 40px; display: grid; gap: 16px; }

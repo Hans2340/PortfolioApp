@@ -6,6 +6,7 @@
     stock: { label: 'Stock', color: '#3b82f6' },
     etf: { label: 'ETF', color: '#14b8a6' },
     fund: { label: 'Mutual fund', color: '#8b5cf6' },
+    asnb: { label: 'ASNB', color: '#0ea5e9' },
     crypto: { label: 'Crypto', color: '#f59e0b' },
     bond: { label: 'Bond', color: '#64748b' },
     commodity: { label: 'Commodity / Gold', color: '#eab308' },
@@ -72,6 +73,7 @@
     setStat('#dayPct', pct(t.dayPct), tone(t.dayChange));
     setStat('#totalGain', signed(t.gain, money), tone(t.gain));
     setStat('#totalGainPct', pct(t.gainPct), tone(t.gain));
+    if (t.dividends > 0) $('#totalGainPct').insertAdjacentHTML('beforeend', ` <span class="muted">· incl. ${money(t.dividends)} dividends</span>`);
     $('#totalCost').textContent = money(t.cost);
 
     const ranked = state.holdings.map((h) => ({ h, m: Calc.holdingMetrics(h) })).filter((x) => x.m.cost > 0 && x.h.type !== 'cash')
@@ -156,6 +158,10 @@
       const t = TYPES[h.type] || TYPES.other;
       const weight = total > 0 ? (m.value / total) * 100 : 0;
       const live = h.priceSource !== 'manual' && Prices.LIVE_TYPES.has(h.type);
+      const fixed = isFixedAsnb(h.type, h.symbol);
+      const priceTag = live ? '' : fixed
+        ? '<span class="tag" title="Fixed price fund (RM1.00)">F</span>'
+        : '<span class="tag" title="Manually priced">M</span>';
       return `<tr data-id="${esc(h.id)}">
         <td class="asset" data-label="Asset"><div class="asset-in">
           <span class="badge" style="--c:${t.color}">${esc(t.label)}</span>
@@ -166,13 +172,14 @@
         </div></td>
         <td class="num" data-label="Quantity">${qtyFmt(+h.quantity || 0)}</td>
         <td class="num" data-label="Avg cost">${money(+h.avgCost || 0, { price: true })}</td>
-        <td class="num" data-label="Price">${money(+h.price || 0, { price: true })}${live ? '' : '<span class="tag" title="Manually priced">M</span>'}</td>
+        <td class="num" data-label="Price">${money(+h.price || 0, { price: true })}${priceTag}</td>
         <td class="num ${tone(m.dayChange)}" data-label="Today">${h.prevClose ? pct(m.dayPct) : '<span class="muted">—</span>'}</td>
         <td class="num strong" data-label="Value">${money(m.value)}</td>
-        <td class="num ${tone(m.gain)}" data-label="Gain / loss">${signed(m.gain, money)}<small>${pct(m.gainPct)}</small></td>
+        <td class="num ${tone(m.gain)}" data-label="Gain / loss">${signed(m.gain, money)}<small>${pct(m.gainPct)}</small>${m.dividends > 0 ? `<small class="div">incl. div ${money(m.dividends)}</small>` : ''}</td>
         <td class="num" data-label="Weight"><span class="weight"><span style="width:${Math.min(weight, 100).toFixed(1)}%;background:${t.color}"></span></span>${weight.toFixed(1)}%</td>
         <td class="actions">
           <button class="btn sm" data-act="trade">Buy / Sell</button>
+          <button class="btn sm" data-act="dividend">Dividend</button>
           <button class="btn sm ghost" data-act="edit" aria-label="Edit ${esc(h.symbol)}">Edit</button>
         </td>
       </tr>`;
@@ -242,24 +249,56 @@
     f.symbol.value = h ? h.symbol : '';
     f.name.value = h ? h.name || '' : '';
     f.quantity.value = h ? h.quantity : '';
-    f.avgCost.value = h ? h.avgCost : '';
+    f.avgCost.value = h ? +(+h.avgCost || 0).toFixed(6) : '';
     f.price.value = h && h.price ? h.price : '';
     f.priceSource.value = h ? h.priceSource || 'auto' : 'auto';
     f.notes.value = h ? h.notes || '' : '';
+    renderDivHistory(h);
     updateSourceHint();
     hDialog.showModal();
     setTimeout(() => (h ? f.quantity : f.symbol).focus(), 30);
   }
 
+  function isFixedAsnb(type, symbol) {
+    if (type !== 'asnb') return false;
+    const fund = ASNB.find(symbol);
+    return !!(fund && fund.fixed);
+  }
+
+  function renderDivHistory(h) {
+    const box = $('#divHistory');
+    const list = h && Array.isArray(h.dividends) ? h.dividends : [];
+    box.hidden = !list.length;
+    if (!list.length) { box.innerHTML = ''; return; }
+    const total = list.reduce((a, d) => a + (+d.amount || 0), 0);
+    box.innerHTML = `<h3><span>Dividend history</span><span>${money(total)}</span></h3><ul>` +
+      list.slice().reverse().map((d) => `<li><span>${esc(d.d ? shortDate(d.d) : '')}${d.rate ? ` · ${d.rate} sen` : ''}</span>` +
+        `<span><b>${money(+d.amount || 0)}</b> ${d.reinvested ? `→ ${qtyFmt(d.units || 0)} units` : 'cash'}</span></li>`).join('') + '</ul>';
+  }
+
   function updateSourceHint() {
     const f = hForm.elements;
+    const isAsnb = f.type.value === 'asnb';
+    if (isAsnb) f.symbol.setAttribute('list', 'asnbFunds'); else f.symbol.removeAttribute('list');
+    f.symbol.placeholder = isAsnb ? 'e.g. ASB, ASM, ASNE5' : 'e.g. AAPL, BTC';
+    const fund = isAsnb ? ASNB.find(f.symbol.value) : null;
+    const fixed = !!(fund && fund.fixed);
+    f.price.disabled = fixed;
+    if (fixed) {
+      f.price.value = ASNB.FIXED_PRICE;
+      if (!f.avgCost.value) f.avgCost.value = ASNB.FIXED_PRICE;
+    }
+    if (fund && (!f.name.value || ASNB.FUNDS.some((x) => x.name === f.name.value))) f.name.value = fund.name;
     const liveCapable = Prices.LIVE_TYPES.has(f.type.value);
     f.priceSource.disabled = !liveCapable;
     if (!liveCapable) f.priceSource.value = 'manual';
     const manual = f.priceSource.value === 'manual';
     f.price.placeholder = manual ? 'Required' : 'Fetched if live';
     let hint = '';
-    if (!liveCapable) hint = 'This asset type is priced manually — update the price whenever you like.';
+    if (fixed) hint = `${fund.name} is a fixed-price fund at RM1.00 per unit. Your return comes from the yearly distribution: record it with the "Dividend" button.`;
+    else if (isAsnb) hint = 'Variable-price fund: enter the latest NAV from the myASNB app or asnb.com.my. Record distributions with the "Dividend" button.';
+    else if (!liveCapable) hint = 'This asset type is priced manually — update the price whenever you like.';
+    if (isAsnb && state.settings.currency !== 'MYR') hint += ' ASNB prices are in RM; set the display currency to MYR in Settings.';
     else if (f.type.value === 'crypto' && !manual) hint = 'Live price from CoinGecko using the symbol (e.g. BTC, ETH, SOL).';
     else if (!manual) hint = state.settings.finnhubKey
       ? 'Live price from Finnhub. Use the exchange ticker, e.g. AAPL, or with a suffix for non‑US markets (e.g. 1155.KL may require a paid plan).'
@@ -274,7 +313,8 @@
     const symbol = f.symbol.value.trim().toUpperCase();
     const quantity = parseFloat(f.quantity.value);
     const avgCost = parseFloat(f.avgCost.value);
-    let price = parseFloat(f.price.value);
+    const fixedFund = isFixedAsnb(f.type.value, f.symbol.value);
+    let price = fixedFund ? ASNB.FIXED_PRICE : parseFloat(f.price.value);
     const manual = f.priceSource.value === 'manual' || !Prices.LIVE_TYPES.has(f.type.value);
 
     if (!symbol) return (err.textContent = 'Enter a symbol or short name.');
@@ -319,6 +359,47 @@
     persist();
     render();
     toast(`${h.symbol} deleted`);
+  }
+
+  // ---------- dividend dialog ----------
+  const dDialog = $('#divDialog');
+  const dForm = $('#divForm');
+  let divId = null;
+
+  function openDividend(h) {
+    divId = h.id;
+    dForm.reset();
+    $('#divError').textContent = '';
+    $('#divTitle').textContent = `${h.symbol} — Record dividend`;
+    $('#divUnits').textContent = `You hold ${qtyFmt(+h.quantity || 0)} units.`;
+    const f = dForm.elements;
+    f.date.value = Calc.isoDate(new Date());
+    f.reinvest.checked = h.type === 'asnb';
+    f.unitPrice.value = h.price || '';
+    f.unitPrice.disabled = isFixedAsnb(h.type, h.symbol);
+    $('#divPriceWrap').hidden = !f.reinvest.checked;
+    dDialog.showModal();
+    setTimeout(() => f.rate.focus(), 30);
+  }
+
+  function saveDividend(e) {
+    e.preventDefault();
+    const h = state.holdings.find((x) => x.id === divId);
+    const f = dForm.elements;
+    const err = $('#divError');
+    if (!h) return dDialog.close();
+    const amount = parseFloat(f.amount.value);
+    const unitPrice = parseFloat(f.unitPrice.value);
+    if (!f.date.value) return (err.textContent = 'Choose the payment date.');
+    if (!(amount > 0)) return (err.textContent = 'Enter the amount received.');
+    if (f.reinvest.checked && !(unitPrice > 0)) return (err.textContent = 'Enter the price the units were bought at.');
+    Calc.recordDividend(h, {
+      amount, date: f.date.value, reinvest: f.reinvest.checked, unitPrice, rate: parseFloat(f.rate.value) || 0,
+    });
+    dDialog.close();
+    persist();
+    render();
+    toast(`Recorded ${money(amount)} dividend for ${h.symbol}`);
   }
 
   // ---------- trade dialog ----------
@@ -516,6 +597,16 @@
     $('#deleteBtn').addEventListener('click', deleteHolding);
 
     tForm.addEventListener('submit', saveTrade);
+    dForm.addEventListener('submit', saveDividend);
+    dForm.elements.reinvest.addEventListener('change', (e) => { $('#divPriceWrap').hidden = !e.target.checked; });
+    dForm.elements.rate.addEventListener('input', (e) => {
+      const h = state.holdings.find((x) => x.id === divId);
+      const rate = parseFloat(e.target.value);
+      if (h && rate > 0) dForm.elements.amount.value = ((+h.quantity || 0) * rate / 100).toFixed(2);
+    });
+    $('#asnbFunds').innerHTML = ASNB.FUNDS.map((x) =>
+      `<option value="${x.code}">${esc(x.name)}${x.fixed ? ' (fixed RM1.00)' : ''}</option>`).join('');
+    hForm.elements.symbol.addEventListener('input', updateSourceHint);
     $$('#tradeSide button').forEach((b) => b.addEventListener('click', () => setSide(b.dataset.side)));
 
     sForm.addEventListener('submit', saveSettings);
@@ -542,6 +633,7 @@
       const h = state.holdings.find((x) => x.id === row.dataset.id);
       if (!h) return;
       if (btn && btn.dataset.act === 'trade') openTrade(h);
+      else if (btn && btn.dataset.act === 'dividend') openDividend(h);
       else openHolding(h);
     });
 

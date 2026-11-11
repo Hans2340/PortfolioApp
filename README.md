@@ -18,6 +18,14 @@ No build step, no server, no dependencies. Open it in a browser and start adding
   - Best and worst performers.
   - Performance chart (1M / 3M / 6M / 1Y / All) comparing market value with amount invested. The period return excludes deposits.
   - Allocation donut, by asset type or by holding.
+- **ASNB unit trusts**
+  - Pick from the built-in fund list: ASB, ASB 2, ASB 3 Didik, ASM, ASM 2 Wawasan, ASM 3, ASN, ASN Equity 2/3/5/Global, ASN Imbang 1/2/3 Global, ASN Sara 1/2 and ASN Sukuk.
+  - Fixed-price funds are locked at RM1.00 per unit.
+  - Variable-price funds use the NAV you enter from the myASNB app or asnb.com.my. ASNB has no public price API.
+- **Dividends:** record a dividend or distribution on any holding.
+  - Enter the amount, or a rate in sen per unit to estimate it.
+  - Mark it **reinvested** (new units are added and the amount invested stays the same) or **paid out** in cash.
+  - Dividends count towards gain/loss, and each holding keeps its dividend history.
 - **Holdings table:** search, filter by type, and sort by value, gain, gain % or today %. On phones the table turns into cards.
 - **Data**
   - Everything is stored in your browser (`localStorage`).
@@ -57,6 +65,7 @@ css/styles.css        styles, theming, responsive layout
 js/calc.js            pure calculations (metrics, totals, allocation, history, CSV)
 js/storage.js         localStorage persistence
 js/prices.js          CoinGecko / Finnhub price providers
+js/asnb.js            ASNB fund list (fixed vs variable price)
 js/charts.js          dependency-free SVG line + donut charts
 js/app.js             UI state, rendering and event wiring
 tests/calc.test.js    unit tests

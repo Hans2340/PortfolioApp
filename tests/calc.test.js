@@ -63,3 +63,30 @@ test('toCSV escapes commas and quotes', () => {
   const csv = Calc.toCSV([{ type: 'stock', symbol: 'X', name: 'Foo, "Bar"', quantity: 1, avgCost: 1, price: 2 }]);
   assert.match(csv, /"Foo, ""Bar"""/);
 });
+
+test('reinvested dividend on a fixed-price fund adds units and shows as gain', () => {
+  const h = { quantity: 10000, avgCost: 1, price: 1 };
+  Calc.recordDividend(h, { amount: 550, date: '2026-01-01', reinvest: true, unitPrice: 1 });
+  assert.equal(h.quantity, 10550);
+  const m = Calc.holdingMetrics(h);
+  assert.ok(Math.abs(m.cost - 10000) < 1e-9);
+  assert.ok(Math.abs(m.gain - 550) < 1e-9);
+  assert.ok(Math.abs(m.gainPct - 5.5) < 1e-9);
+  assert.equal(m.dividends, 550);
+});
+
+test('cash dividend counts as income in gain', () => {
+  const h = { quantity: 100, avgCost: 10, price: 10 };
+  Calc.recordDividend(h, { amount: 25, date: '2026-01-01', reinvest: false });
+  assert.equal(h.quantity, 100);
+  const m = Calc.holdingMetrics(h);
+  assert.equal(m.gain, 25);
+  assert.equal(Calc.portfolioTotals([h]).dividends, 25);
+});
+
+test('ASNB fund lookup', () => {
+  const ASNB = require('../js/asnb.js');
+  assert.equal(ASNB.find('asb').fixed, true);
+  assert.equal(ASNB.find('ASN Equity 5'), null);
+  assert.equal(ASNB.find('ASNE5').fixed, false);
+});
