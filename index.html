@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Track your stocks, ETFs, crypto and other holdings in one place.">
+  <meta name="theme-color" content="#0f172a">
+  <title>Portfolio Monitor</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="icon.svg" alt="" width="28" height="28">
+      <span>Portfolio Monitor</span>
+    </div>
+    <div class="topbar-actions">
+      <span class="last-updated" id="lastUpdated"></span>
+      <button class="btn icon" id="refreshBtn" title="Refresh prices" aria-label="Refresh prices">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7"/></svg>
+      </button>
+      <button class="btn icon" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+      <button class="btn icon" id="settingsBtn" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="summary" aria-label="Portfolio summary">
+      <article class="stat stat-main">
+        <h2>Total value</h2>
+        <p class="stat-value" id="totalValue">—</p>
+        <p class="stat-sub" id="totalCount"></p>
+      </article>
+      <article class="stat">
+        <h2>Today</h2>
+        <p class="stat-value" id="dayChange">—</p>
+        <p class="stat-sub" id="dayPct"></p>
+      </article>
+      <article class="stat">
+        <h2>Total gain / loss</h2>
+        <p class="stat-value" id="totalGain">—</p>
+        <p class="stat-sub" id="totalGainPct"></p>
+      </article>
+      <article class="stat">
+        <h2>Invested</h2>
+        <p class="stat-value" id="totalCost">—</p>
+        <p class="stat-sub" id="bestWorst"></p>
+      </article>
+    </section>
+
+    <section class="charts">
+      <article class="card">
+        <div class="card-head">
+          <h2>Performance</h2>
+          <div class="seg" role="tablist" id="rangeSeg">
+            <button data-range="1M">1M</button><button data-range="3M">3M</button>
+            <button data-range="6M">6M</button><button data-range="1Y">1Y</button>
+            <button data-range="ALL" class="active">All</button>
+          </div>
+        </div>
+        <p class="perf-change" id="perfChange"></p>
+        <div class="line-chart" id="lineChart"></div>
+        <div class="legend-inline">
+          <span><i class="sw sw-value"></i>Market value</span>
+          <span><i class="sw sw-cost"></i>Invested</span>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-head">
+          <h2>Allocation</h2>
+          <div class="seg" id="allocSeg">
+            <button data-by="type" class="active">By type</button>
+            <button data-by="holding">By holding</button>
+          </div>
+        </div>
+        <div class="alloc">
+          <div class="donut-wrap" id="donut"></div>
+          <ul class="legend" id="legend"></ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="card holdings">
+      <div class="card-head wrap">
+        <h2>Holdings</h2>
+        <button class="btn primary" id="addBtn">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Add holding
+        </button>
+      </div>
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="Search symbol or name" aria-label="Search holdings">
+        <select id="typeFilter" aria-label="Filter by type">
+          <option value="">All types</option>
+        </select>
+        <select id="sortBy" aria-label="Sort holdings">
+          <option value="value">Sort: Value</option>
+          <option value="gainPct">Sort: Gain %</option>
+          <option value="gain">Sort: Gain</option>
+          <option value="dayPct">Sort: Today %</option>
+          <option value="symbol">Sort: Symbol</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table" id="holdingsTable">
+          <thead>
+            <tr>
+              <th>Asset</th>
+              <th class="num">Quantity</th>
+              <th class="num">Avg cost</th>
+              <th class="num">Price</th>
+              <th class="num">Today</th>
+              <th class="num">Value</th>
+              <th class="num">Gain / loss</th>
+              <th class="num">Weight</th>
+              <th><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody id="holdingsBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptyState" hidden>
+        <p><strong>No holdings yet.</strong></p>
+        <p>Add your first stock, ETF, crypto or any other asset — or load sample data to explore.</p>
+        <div class="empty-actions">
+          <button class="btn primary" id="emptyAdd">Add holding</button>
+          <button class="btn" id="emptyDemo">Load sample portfolio</button>
+        </div>
+      </div>
+    </section>
+
+    <p class="footnote">Data is stored only in this browser. Crypto prices from CoinGecko; stock prices from Finnhub (API key required). Prices may be delayed.</p>
+  </main>
+
+  <!-- Add / edit holding -->
+  <dialog id="holdingDialog" class="dialog">
+    <form method="dialog" id="holdingForm" novalidate>
+      <header class="dialog-head">
+        <h2 id="holdingDialogTitle">Add holding</h2>
+        <button type="button" class="btn icon ghost" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="dialog-body">
+        <input type="hidden" name="id">
+        <div class="grid-2">
+          <label>Type
+            <select name="type" required></select>
+          </label>
+          <label>Symbol / ticker
+            <input name="symbol" required autocomplete="off" autocapitalize="characters" placeholder="e.g. AAPL, BTC">
+          </label>
+        </div>
+        <label><span>Name <span class="opt">(optional)</span></span>
+          <input name="name" autocomplete="off" placeholder="e.g. Apple Inc.">
+        </label>
+        <div class="grid-2">
+          <label>Quantity
+            <input name="quantity" type="number" step="any" min="0" required inputmode="decimal">
+          </label>
+          <label>Average cost per unit
+            <input name="avgCost" type="number" step="any" min="0" required inputmode="decimal">
+          </label>
+        </div>
+        <div class="grid-2">
+          <label>Price source
+            <select name="priceSource">
+              <option value="auto">Live (auto update)</option>
+              <option value="manual">Manual</option>
+            </select>
+          </label>
+          <label>Current price
+            <input name="price" type="number" step="any" min="0" inputmode="decimal" placeholder="Fetched if live">
+          </label>
+        </div>
+        <label><span>Notes <span class="opt">(optional)</span></span>
+          <input name="notes" autocomplete="off" placeholder="Broker, account, strategy…">
+        </label>
+        <p class="hint" id="sourceHint"></p>
+        <p class="form-error" id="formError" role="alert"></p>
+      </div>
+      <footer class="dialog-foot">
+        <button type="button" class="btn danger ghost" id="deleteBtn" hidden>Delete</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary" id="saveBtn">Save</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Buy / sell more -->
+  <dialog id="tradeDialog" class="dialog">
+    <form method="dialog" id="tradeForm" novalidate>
+      <header class="dialog-head">
+        <h2 id="tradeTitle">Trade</h2>
+        <button type="button" class="btn icon ghost" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="dialog-body">
+        <div class="seg seg-full" id="tradeSide">
+          <button type="button" data-side="buy" class="active">Buy</button>
+          <button type="button" data-side="sell">Sell</button>
+        </div>
+        <div class="grid-2">
+          <label>Quantity
+            <input name="qty" type="number" step="any" min="0" required inputmode="decimal">
+          </label>
+          <label>Price per unit
+            <input name="price" type="number" step="any" min="0" required inputmode="decimal">
+          </label>
+        </div>
+        <p class="hint" id="tradeHint"></p>
+        <p class="form-error" id="tradeError" role="alert"></p>
+      </div>
+      <footer class="dialog-foot">
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary">Confirm</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Settings -->
+  <dialog id="settingsDialog" class="dialog">
+    <form method="dialog" id="settingsForm">
+      <header class="dialog-head">
+        <h2>Settings</h2>
+        <button type="button" class="btn icon ghost" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="dialog-body">
+        <div class="grid-2">
+          <label>Display currency
+            <select name="currency">
+              <option>USD</option><option>EUR</option><option>GBP</option><option>MYR</option>
+              <option>SGD</option><option>JPY</option><option>AUD</option><option>CAD</option>
+              <option>INR</option><option>IDR</option><option>CHF</option><option>HKD</option>
+            </select>
+          </label>
+          <label>Auto refresh
+            <select name="autoRefresh">
+              <option value="0">Off</option><option value="1">Every minute</option>
+              <option value="5">Every 5 minutes</option><option value="15">Every 15 minutes</option>
+            </select>
+          </label>
+        </div>
+        <label><span>Finnhub API key <span class="opt">(for live stock &amp; ETF prices)</span></span>
+          <input name="finnhubKey" autocomplete="off" spellcheck="false" placeholder="Paste your free key">
+        </label>
+        <p class="hint">Get a free key at finnhub.io. It's stored only in this browser. Crypto prices work without a key and are quoted in the display currency; stock quotes are in the exchange's currency.</p>
+
+        <h3>Data</h3>
+        <div class="btn-row">
+          <button type="button" class="btn" id="exportJson">Export backup (JSON)</button>
+          <label class="btn file-btn">Import backup<input type="file" id="importJson" accept="application/json,.json" hidden></label>
+          <button type="button" class="btn" id="exportCsv">Export CSV</button>
+          <button type="button" class="btn" id="loadDemo">Load sample portfolio</button>
+          <button type="button" class="btn danger" id="clearAll">Delete all data</button>
+        </div>
+      </div>
+      <footer class="dialog-foot">
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary">Save settings</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="js/calc.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/prices.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
